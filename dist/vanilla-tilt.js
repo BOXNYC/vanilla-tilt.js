@@ -535,7 +535,7 @@ class VanillaTilt {
     
     settings = settings || {};
     const ask = typeof settings.askForAccessOnDenial === "undefined" ? true : settings.askForAccessOnDenial,
-          mustRequest = typeof( DeviceMotionEvent ) === 'object' && typeof( DeviceMotionEvent.requestPermission ) === "function",
+          mustRequest = typeof( DeviceMotionEvent ) === 'function' && typeof( DeviceMotionEvent.requestPermission ) === "function",
           deviceMotionEventExists = typeof( DeviceMotionEvent ) !== "undefined"
     if ( ask && deviceMotionEventExists && mustRequest ) {
       DeviceMotionEvent.requestPermission().then(response => {
