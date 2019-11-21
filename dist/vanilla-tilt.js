@@ -449,7 +449,8 @@ class VanillaTilt {
       gyroscopeMaxAngleX: 45,
       gyroscopeMinAngleY: -45,
       gyroscopeMaxAngleY: 45,
-      gyroscopeSamples: 10
+      gyroscopeSamples: 10,
+      askForAccessOnDenial: true
     };
 
     let newSettings = {};
@@ -471,8 +472,8 @@ class VanillaTilt {
 
     return newSettings;
   }
-
-  static init(elements, settings) {
+  
+  static begin(elements, settings) {
     if (elements instanceof Node) {
       elements = [elements];
     }
@@ -491,6 +492,63 @@ class VanillaTilt {
       }
     });
   }
+  
+  static requestGesture(elements, settings) {
+    const promptDiv = document.createElement('div'),
+          cancelButton = document.createElement('button'),
+          okButton = document.createElement('button'),
+          style = document.createElement('style'),
+          css = `
+            #vanilla-tilt-prompt { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; min-width: 270px; background-color: rgba(0,0,0,0.7); padding: 1.5rem 2rem 5rem 2rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); text-align: center; font-weight: bold; }
+            #vanilla-tilt-prompt-cancel, #vanilla-tilt-prompt-okay { padding: 1rem; position: absolute; left: 0; bottom: 0; border-radius: 0 0 0 6px; border-top: 1px solid white; width: 50%; color: white; font-weight: bold; }
+            #vanilla-tilt-prompt-cancel:hover, #vanilla-tilt-prompt-okay:hover { background-color: rgba(0,0,0,0.7); }
+            #vanilla-tilt-prompt-okay { left: auto; right: 0; border-radius: 0 0 6px 0; border-left: 1px solid white; }
+          `;
+    promptDiv.id = "vanilla-tilt-prompt";
+    cancelButton.id = promptDiv.id + "-cancel";
+    okButton.id = promptDiv.id + "-okay";
+    promptDiv.innerHTML = '"'+location.hostname+'" Would like to Request Access for Motion and Orientation. Okay?';
+    cancelButton.innerHTML = "Cancel";
+    okButton.innerHTML = "Okay";
+    style.innerHTML = css;
+    promptDiv.appendChild(cancelButton);
+    promptDiv.appendChild(okButton);
+    promptDiv.appendChild(style);
+    function removeEvents() {
+      document.body.removeChild(promptDiv);
+      cancelButton.removeEventListener("touchend", cancel);
+      okButton.removeEventListener("touchend", ok);
+    }
+    function cancel() {
+      removeEvents();
+    }
+    function ok() {
+      VanillaTilt.init(elements, settings);
+      removeEvents();
+    }
+    cancelButton.addEventListener("touchend", cancel);
+    okButton.addEventListener("touchend", ok);
+    document.body.appendChild(promptDiv);
+  }
+
+  static init(elements, settings) {
+    
+    settings = settings || {};
+    const ask = typeof settings.askForAccessOnDenial === "undefined" ? true : settings.askForAccessOnDenial,
+          mustRequest = typeof( DeviceMotionEvent ) === 'function' && typeof( DeviceMotionEvent.requestPermission ) === "function",
+          deviceMotionEventExists = typeof( DeviceMotionEvent ) !== "undefined";console.log(`${ask} && ${deviceMotionEventExists} && ${mustRequest}`);
+    if ( ask && deviceMotionEventExists && mustRequest ) {
+      DeviceMotionEvent.requestPermission().then(response => {
+        if (response == "granted") VanillaTilt.begin(elements, settings);
+      }).catch(err=>{
+        if (String(err).indexOf("motion access requires a user gesture to prompt")>-1)
+          VanillaTilt.requestGesture(elements, settings);
+      })
+      return;
+    }
+    VanillaTilt.begin(elements, settings);
+    
+  }
 }
 
 if (typeof document !== "undefined") {
@@ -500,7 +558,16 @@ if (typeof document !== "undefined") {
   /**
    * Auto load
    */
-  VanillaTilt.init(document.querySelectorAll("[data-tilt]"));
+  const autos = document.querySelectorAll("[data-tilt]"),
+        settings = {};
+  let ask = '';
+  for(let i=0; i<autos.length; i++)
+    if (autos[i].hasAttribute("data-tilt-ask-for-access-on-denial"))
+      ask = autos[i].getAttribute("data-tilt-ask-for-access-on-denial");
+  ask = ask.toLowerCase();
+  if (ask == "true") settings.askForAccessOnDenial = true;
+  if (ask == "false") settings.askForAccessOnDenial = false;
+  VanillaTilt.init(autos, settings);
 }
 
 return VanillaTilt;
